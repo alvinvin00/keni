@@ -20,6 +20,9 @@ class Transaction(SQLModel, table=True):
     group_id: uuid.UUID | None = Field(
         default=None, foreign_key="transactions.id", index=True, ondelete="CASCADE"
     )
+    transfer_to_wallet_id: uuid.UUID | None = Field(
+        default=None, foreign_key="wallets.id", index=True, ondelete="CASCADE"
+    )
     type: str = Field(default="expense", max_length=10)
     amount: float
     description: str | None = Field(default=None, max_length=500)
