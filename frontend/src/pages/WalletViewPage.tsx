@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useOutletContext, useNavigate, type Navigat
 import { ArrowLeftRight, Check, ChevronDown, Command, CornerDownRight, Filter, FolderOpen, Plus, Search, SortAsc, SortDesc, Sparkles, Tag, Trash2, X } from 'lucide-react';
 import { expenses as expensesApi, categories as categoriesApi, wallets as walletsApi, tags as tagsApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useWallet } from '../contexts/WalletContext';
 import { useToast } from '../components/ui/Toast';
 import { Select } from '../components/ui/Select';
 import { DatePicker } from '../components/ui/DatePicker';
@@ -40,6 +41,7 @@ export function WalletViewPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
   const { user } = useAuth();
+  const { wallets: allWallets } = useWallet();
   const { expenseAddedKey } = useOutletContext<LayoutOutletContext>();
   const navigate = useNavigate();
   const ctxMenu = useTransactionContextMenu();
@@ -161,7 +163,7 @@ export function WalletViewPage() {
           end_date: endDate || undefined,
           min_amount: minAmount ? Number(minAmount) : undefined,
           max_amount: maxAmount ? Number(maxAmount) : undefined,
-          type: typeFilter === 'expense' || typeFilter === 'income' ? typeFilter : undefined,
+          type: typeFilter === 'expense' || typeFilter === 'income' || typeFilter === 'transfer' ? typeFilter : undefined,
           has_children: hasChildrenFilter ? 'true' : undefined,
           include_children: includeChildren ? 'true' : undefined,
           only_children: onlyChildren ? 'true' : undefined,
@@ -488,6 +490,8 @@ export function WalletViewPage() {
   // Tags that can still match given the other active filters; ineligible ones are dimmed, not hidden.
   const availableTagIds = useMemo(() => new Set(data?.available_tag_ids ?? []), [data]);
 
+  const walletNames = useMemo(() => new Map(allWallets.map((w) => [w.id, w.name])), [allWallets]);
+
   useLayoutEffect(() => {
     if (!isMobile || tagsCollapsed !== null || !tagListRef.current) return;
     const rows = new Set([...tagListRef.current.children].map((el) => (el as HTMLElement).offsetTop)).size;
@@ -802,7 +806,7 @@ export function WalletViewPage() {
     </Modal>
   );
 
-  const outstanding = wallet ? Math.max(wallet.total_expenses - wallet.total_income, 0) : 0;
+  const outstanding = wallet ? Math.max(wallet.total_expenses - wallet.total_income - (wallet.transfer_in ?? 0), 0) : 0;
   const creditLimit = wallet?.credit_limit ?? null;
   const availableCredit = creditLimit != null ? creditLimit - outstanding : null;
   const utilization = creditLimit != null && creditLimit > 0 ? Math.round((outstanding / creditLimit) * 1000) / 10 : null;
@@ -928,6 +932,7 @@ export function WalletViewPage() {
                 { value: '', label: t('walletView.filterTypeAll') },
                 { value: 'expense', label: t('walletView.filterTypeExpense') },
                 { value: 'income', label: t('walletView.filterTypeIncome') },
+                { value: 'transfer', label: t('walletView.filterTypeTransfer') },
               ]}
             />
           </div>
@@ -1059,6 +1064,7 @@ export function WalletViewPage() {
                 expense={expense}
                 currency={wallet?.currency ?? 'USD'}
                 walletId={walletId!}
+                walletNames={walletNames}
                 isLast={i === data.items.length - 1}
                 fxRate={rateFor(expense)}
                 globalCurrency={user?.global_currency ?? null}
@@ -1141,6 +1147,7 @@ function ExpenseRow({
   expense,
   currency,
   walletId,
+  walletNames,
   isLast,
   fxRate,
   globalCurrency,
@@ -1161,6 +1168,7 @@ function ExpenseRow({
   expense: TransactionResponse;
   currency: string;
   walletId: string;
+  walletNames: Map<string, string>;
   isLast: boolean;
   fxRate: number | null;
   globalCurrency: string | null;
@@ -1178,10 +1186,19 @@ function ExpenseRow({
   onCategoryContextMenu: (e: React.MouseEvent, category: CategoryBrief) => void;
   onCategoryClick: (categoryId: string) => void;
 }) {
+  const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
   const convertedAmount = fxRate != null ? expense.amount * fxRate : null;
   const hasConversion = convertedAmount != null && globalCurrency != null;
-  const color = amountColor(expense.amount, expense.type);
+  const isTransfer = expense.transfer_to_wallet_id != null;
+  const isOutgoing = expense.wallet_id === walletId;
+  const transferLabel = isTransfer
+    ? isOutgoing
+      ? `→ ${walletNames.get(expense.transfer_to_wallet_id!) ?? ''}`
+      : t('transfer.incomingPrefix', { name: walletNames.get(expense.wallet_id) ?? '' })
+    : null;
+  const signType = isTransfer ? (isOutgoing ? 'expense' : 'income') : expense.type;
+  const color = isTransfer ? 'var(--ink-mid)' : amountColor(expense.amount, expense.type);
 
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -1276,8 +1293,9 @@ function ExpenseRow({
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: isTransfer ? 'var(--ink-mid)' : 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {expense.group_id && <CornerDownRight size={13} style={{ color: 'var(--ink-faint)', marginRight: 4, verticalAlign: -1 }} />}
+          {isTransfer && <ArrowLeftRight size={13} style={{ color: 'var(--ink-faint)', marginRight: 4, verticalAlign: -1 }} />}
           {expense.description ?? expense.category.name}
         </div>
         <TransactionMeta
@@ -1294,6 +1312,7 @@ function ExpenseRow({
               onMouseLeave={(e) => { e.currentTarget.style.textDecoration = 'none'; }}
             >
               {expense.category.name}
+              {transferLabel && <span style={{ color: 'var(--ink-faint)' }}> · {transferLabel}</span>}
             </span>
           }
         />
@@ -1306,7 +1325,7 @@ function ExpenseRow({
               className={switching ? 'amount-switching' : ''}
               style={{ fontSize: 15, fontWeight: 600, color }}
             >
-              {showConverted ? fmtSigned(convertedAmount!, expense.type, globalCurrency!) : fmtSigned(expense.amount, expense.type, currency)}
+              {showConverted ? fmtSigned(convertedAmount!, signType, globalCurrency!) : fmtSigned(expense.amount, signType, currency)}
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
               {fmtRelative(expense.date)}
@@ -1315,7 +1334,7 @@ function ExpenseRow({
         ) : (
           <>
             <div style={{ fontSize: 15, fontWeight: 600, color }}>
-              {fmtSigned(expense.amount, expense.type, currency)}
+              {fmtSigned(expense.amount, signType, currency)}
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
               {hasConversion

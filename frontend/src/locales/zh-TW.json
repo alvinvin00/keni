@@ -178,6 +178,9 @@
     "toastUpdated": "錢包已更新",
     "toastDeleted": "錢包已刪除"
   },
+  "transfer": {
+    "incomingPrefix": "來自 {{name}}"
+  },
   "budgets": {
     "title": "預算",
     "subtitle": "設定消費上限並追蹤進度",
@@ -300,6 +303,7 @@
     "filterTypeAll": "全部",
     "filterTypeExpense": "支出",
     "filterTypeIncome": "收入",
+    "filterTypeTransfer": "轉帳",
     "filterSubTransactions": "子交易",
     "filterHideSubTransactions": "隱藏",
     "filterHasSubTransactions": "僅主交易",

@@ -178,6 +178,9 @@
     "toastUpdated": "Wallet updated",
     "toastDeleted": "Wallet deleted"
   },
+  "transfer": {
+    "incomingPrefix": "from {{name}}"
+  },
   "budgets": {
     "title": "Budgets",
     "subtitle": "Set spending limits and track your progress",
@@ -300,6 +303,7 @@
     "filterTypeAll": "All",
     "filterTypeExpense": "Expenses",
     "filterTypeIncome": "Income",
+    "filterTypeTransfer": "Transfers",
     "filterSubTransactions": "Sub-transactions",
     "filterHideSubTransactions": "Hide",
     "filterHasSubTransactions": "Parents only",
