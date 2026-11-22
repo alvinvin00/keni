@@ -5,6 +5,7 @@ export default defineConfig({
   workers: 1,
   use: {
     baseURL: 'http://localhost:5173',
+    video: process.env.E2E_VIDEO ? 'on' : 'off',
   },
   webServer: [
     {
