@@ -292,6 +292,17 @@ export const expenses = {
   },
 };
 
+export const transfers = {
+  create: (
+    walletId: string,
+    data: { to_wallet_id: string; amount: number; description?: string; date?: string },
+  ) =>
+    request<TransactionResponse>(`/wallets/${walletId}/transfers`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
 export const categories = {
   list: () => request<CategoryResponse[]>('/categories'),
   create: (data: { name: string; icon?: string | null; color?: string }) =>

@@ -34,6 +34,8 @@ export interface WalletSummary extends WalletResponse {
   expense_count: number;
   total_income: number;
   income_count: number;
+  transfer_in: number;
+  transfer_out: number;
   balance: number;
 }
 
@@ -89,6 +91,7 @@ export interface TransactionResponse {
   date: string;
   tags: TagBrief[];
   group_id: string | null;
+  transfer_to_wallet_id: string | null;
   children: TransactionResponse[] | null;
   linked_transactions: TransactionLinkBrief[];
   created_at: string;
