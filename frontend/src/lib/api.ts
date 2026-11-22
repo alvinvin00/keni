@@ -168,9 +168,9 @@ export const users = {
 export const wallets = {
   list: () => request<WalletResponse[]>('/wallets'),
   get: (id: string) => request<WalletSummary>(`/wallets/${id}`),
-  create: (data: { name: string; currency: string }) =>
+  create: (data: { name: string; currency: string; type?: 'debit' | 'credit'; credit_limit?: number | null; closing_day?: number | null; due_day?: number | null }) =>
     request<WalletResponse>('/wallets', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: { name?: string; currency?: string }) =>
+  update: (id: string, data: { name?: string; currency?: string; type?: 'debit' | 'credit'; credit_limit?: number | null; closing_day?: number | null; due_day?: number | null }) =>
     request<WalletResponse>(`/wallets/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/wallets/${id}`, { method: 'DELETE' }),
 };

@@ -22,6 +22,10 @@ export interface WalletResponse {
   user_id: string;
   name: string;
   currency: string;
+  type: 'debit' | 'credit';
+  credit_limit: number | null;
+  closing_day: number | null;
+  due_day: number | null;
   created_at: string;
 }
 
