@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -47,7 +48,12 @@ async def _build_transaction_rows(
     transaction_type: str | None,
     session: AsyncSession,
 ) -> list[dict]:
-    query = select(Transaction).where(Transaction.wallet_id == wallet_id)
+    query = select(Transaction).where(
+        or_(
+            col(Transaction.wallet_id) == wallet_id,
+            col(Transaction.transfer_to_wallet_id) == wallet_id,
+        )
+    )
     if start_date:
         query = query.where(col(Transaction.date) >= start_date)
     if end_date:

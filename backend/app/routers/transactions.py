@@ -928,7 +928,7 @@ async def ai_categorize_transaction(
 
 
 @router.patch("/{transaction_id}")
-async def update_transaction(
+async def update_transaction(  # ruff: ignore[too-many-branches]
     wallet_id: uuid.UUID,
     transaction_id: uuid.UUID,
     body: TransactionUpdate,
@@ -937,6 +937,13 @@ async def update_transaction(
 ) -> TransactionResponse:
     await _get_wallet_or_404(wallet_id, current_user.id, session)
     transaction = await _get_transaction_or_404(transaction_id, wallet_id, session)
+
+    if (
+        transaction.type == "transfer" and body.type is not None and body.type != "transfer"  # pyright: ignore[reportUnnecessaryComparison]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="transfer type is immutable"
+        )
 
     if body.wallet_id is not None and body.wallet_id != wallet_id:
         if transaction.group_id is not None:
