@@ -27,6 +27,10 @@ def _wallet_to_response(wallet: Wallet) -> WalletResponse:
         user_id=wallet.user_id,
         name=wallet.name,
         currency=wallet.currency,
+        type=wallet.type,
+        credit_limit=wallet.credit_limit,
+        closing_day=wallet.closing_day,
+        due_day=wallet.due_day,
         created_at=wallet.created_at,
     )
 
@@ -47,7 +51,15 @@ async def _get_wallet_or_404(
 async def create_wallet(
     body: WalletCreate, current_user: CurrentUser, session: DbDep
 ) -> WalletResponse:
-    wallet = Wallet(user_id=current_user.id, name=body.name, currency=body.currency)
+    wallet = Wallet(
+        user_id=current_user.id,
+        name=body.name,
+        currency=body.currency,
+        type=body.type,
+        credit_limit=body.credit_limit,
+        closing_day=body.closing_day,
+        due_day=body.due_day,
+    )
     session.add(wallet)
     await session.commit()
     await session.refresh(wallet)
@@ -104,6 +116,10 @@ async def get_wallet(
         user_id=wallet.user_id,
         name=wallet.name,
         currency=wallet.currency,
+        type=wallet.type,
+        credit_limit=wallet.credit_limit,
+        closing_day=wallet.closing_day,
+        due_day=wallet.due_day,
         created_at=wallet.created_at,
         total_expenses=float(total_expenses),
         expense_count=int(expense_count),
@@ -119,10 +135,30 @@ async def update_wallet(
 ) -> WalletResponse:
     wallet = await _get_wallet_or_404(wallet_id, current_user.id, session)
 
-    if body.name is not None:
-        wallet.name = body.name
-    if body.currency is not None:
-        wallet.currency = body.currency
+    if body.type == "debit" and (
+        body.credit_limit is not None or body.closing_day is not None or body.due_day is not None
+    ):
+        msg = "credit fields require a credit wallet"
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=msg)
+    if (
+        wallet.type == "debit"
+        and body.type is None
+        and (
+            body.credit_limit is not None
+            or body.closing_day is not None
+            or body.due_day is not None
+        )
+    ):
+        msg = "credit fields require a credit wallet"
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=msg)
+
+    updates = body.model_dump(exclude_unset=True)
+    # name/currency are NOT NULL and were never clearable — ignore explicit nulls.
+    for field in ("name", "currency"):
+        if updates.get(field) is None:
+            updates.pop(field, None)
+    for field, value in updates.items():
+        setattr(wallet, field, value)
 
     session.add(wallet)
     await session.commit()
