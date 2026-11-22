@@ -24,6 +24,15 @@ import { useIsMobile } from '../lib/useIsMobile';
 import { TransactionMeta } from '../components/TransactionMeta';
 
 
+function CreditStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--cream-darker)', borderRadius: 12, padding: '10px 14px', minWidth: 120 }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-light)' }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginTop: 2 }}>{value}</div>
+    </div>
+  );
+}
+
 export function WalletViewPage() {
   const color = useColor();
   const { t } = useTranslation();
@@ -793,6 +802,11 @@ export function WalletViewPage() {
     </Modal>
   );
 
+  const outstanding = wallet ? Math.max(wallet.total_expenses - wallet.total_income, 0) : 0;
+  const creditLimit = wallet?.credit_limit ?? null;
+  const availableCredit = creditLimit != null ? creditLimit - outstanding : null;
+  const utilization = creditLimit != null && creditLimit > 0 ? Math.round((outstanding / creditLimit) * 1000) / 10 : null;
+
   return (
     <div className="animate-fade-in">
       <div className="page-header">
@@ -800,6 +814,15 @@ export function WalletViewPage() {
           <h1 className="page-title">{wallet?.name ?? t('walletView.titleFallback')}</h1>
         </div>
       </div>
+      {wallet?.type === 'credit' && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          <CreditStat label={t('wallets.outstanding')} value={fmt(outstanding, wallet.currency)} />
+          {availableCredit != null && (
+            <CreditStat label={t('wallets.availableCredit')} value={fmt(availableCredit, wallet.currency)} />
+          )}
+          {utilization != null && <CreditStat label={t('wallets.utilization')} value={`${utilization}%`} />}
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <form
           style={{ flex: 1, minWidth: 200, position: 'relative' }}
