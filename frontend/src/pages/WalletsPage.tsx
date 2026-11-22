@@ -17,7 +17,7 @@ export function WalletsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editWallet, setEditWallet] = useState<WalletResponse | null>(null);
   const [deleteWallet, setDeleteWallet] = useState<WalletResponse | null>(null);
-  const [form, setForm] = useState({ name: '', currency: 'USD' });
+  const [form, setForm] = useState({ name: '', currency: 'USD', type: 'debit' as 'debit' | 'credit', credit_limit: '', closing_day: '', due_day: '' });
   const [saving, setSaving] = useState(false);
   const [currencies, setCurrencies] = useState<string[]>([]);
 
@@ -26,12 +26,19 @@ export function WalletsPage() {
   }, []);
 
   const openCreate = () => {
-    setForm({ name: '', currency: 'USD' });
+    setForm({ name: '', currency: 'USD', type: 'debit', credit_limit: '', closing_day: '', due_day: '' });
     setShowCreate(true);
   };
 
   const openEdit = (w: WalletResponse) => {
-    setForm({ name: w.name, currency: w.currency });
+    setForm({
+      name: w.name,
+      currency: w.currency,
+      type: w.type,
+      credit_limit: w.credit_limit != null ? String(w.credit_limit) : '',
+      closing_day: w.closing_day != null ? String(w.closing_day) : '',
+      due_day: w.due_day != null ? String(w.due_day) : '',
+    });
     setEditWallet(w);
   };
 
@@ -39,12 +46,25 @@ export function WalletsPage() {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
+      const payload: {
+        name: string;
+        currency: string;
+        type: 'debit' | 'credit';
+        credit_limit?: number | null;
+        closing_day?: number | null;
+        due_day?: number | null;
+      } = { name: form.name, currency: form.currency, type: form.type };
+      if (form.type === 'credit') {
+        payload.credit_limit = form.credit_limit.trim() ? Number(form.credit_limit) : undefined;
+        payload.closing_day = form.closing_day.trim() ? Number(form.closing_day) : undefined;
+        payload.due_day = form.due_day.trim() ? Number(form.due_day) : undefined;
+      }
       if (editWallet) {
-        await walletsApi.update(editWallet.id, form);
+        await walletsApi.update(editWallet.id, payload);
         toast(t('wallets.toastUpdated'), 'success');
         setEditWallet(null);
       } else {
-        await walletsApi.create(form);
+        await walletsApi.create(payload);
         toast(t('wallets.toastCreated'), 'success');
         setShowCreate(false);
       }
@@ -106,6 +126,22 @@ export function WalletsPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>{w.name}</span>
+                  {w.type === 'credit' && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '2px 8px',
+                        borderRadius: 100,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: 'var(--forest-tint)',
+                        color: 'var(--forest)',
+                      }}
+                    >
+                      {t('wallets.creditBadge')}
+                    </span>
+                  )}
                 </div>
                 <span style={{ fontSize: 13, color: 'var(--ink-faint)' }}>{w.currency}</span>
               </div>
@@ -165,6 +201,76 @@ export function WalletsPage() {
             searchPlaceholder={t('wallets.currencySearchPlaceholder')}
           />
         </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="btn btn-md"
+            style={{
+              flex: 1,
+              background: form.type === 'debit' ? 'var(--forest)' : 'var(--cream-dark)',
+              color: form.type === 'debit' ? 'var(--cream)' : 'var(--ink-mid)',
+              border: form.type === 'debit' ? '1px solid var(--forest)' : '1px solid var(--sand)',
+            }}
+            onClick={() => setForm({ ...form, type: 'debit' })}
+          >
+            {t('wallets.typeDebit')}
+          </button>
+          <button
+            type="button"
+            className="btn btn-md"
+            style={{
+              flex: 1,
+              background: form.type === 'credit' ? 'var(--forest)' : 'var(--cream-dark)',
+              color: form.type === 'credit' ? 'var(--cream)' : 'var(--ink-mid)',
+              border: form.type === 'credit' ? '1px solid var(--forest)' : '1px solid var(--sand)',
+            }}
+            onClick={() => setForm({ ...form, type: 'credit' })}
+          >
+            {t('wallets.typeCredit')}
+          </button>
+        </div>
+        {form.type === 'credit' && (
+          <>
+            <div className="input-group">
+              <label className="input-label">{t('wallets.fieldCreditLimit')}</label>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="0"
+                value={form.credit_limit}
+                onChange={(e) => setForm({ ...form, credit_limit: e.target.value })}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div className="input-group" style={{ flex: 1 }}>
+                <label className="input-label">{t('wallets.fieldClosingDay')}</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  max="31"
+                  placeholder="1–31"
+                  value={form.closing_day}
+                  onChange={(e) => setForm({ ...form, closing_day: e.target.value })}
+                />
+              </div>
+              <div className="input-group" style={{ flex: 1 }}>
+                <label className="input-label">{t('wallets.fieldDueDay')}</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  max="31"
+                  placeholder="1–31"
+                  value={form.due_day}
+                  onChange={(e) => setForm({ ...form, due_day: e.target.value })}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </Modal>
       <Modal
         open={!!deleteWallet}
