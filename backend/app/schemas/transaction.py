@@ -44,6 +44,13 @@ class TransactionGroupCreate(BaseModel):
     items: list[TransactionCreate]
 
 
+class TransferCreate(BaseModel):
+    to_wallet_id: uuid.UUID
+    amount: float = Field(gt=0)
+    description: str | None = Field(default=None, max_length=500)
+    date: datetime | None = None
+
+
 class TransactionUpdate(BaseModel):
     wallet_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None

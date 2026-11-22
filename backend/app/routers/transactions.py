@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile, status
 from PIL import Image as PILImage
 from sqlalchemy import exists, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -200,6 +201,38 @@ async def _validate_category(
     )
     if not result.first():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+
+
+async def _get_or_create_transfer_category(user_id: uuid.UUID, session: AsyncSession) -> Category:
+    # Case-insensitive: the unique index is on lower(name), so a user-created
+    # "transfer" category must be reused instead of colliding on insert.
+    async def _find() -> Category | None:
+        result = await session.exec(
+            select(Category).where(
+                Category.user_id == user_id, func.lower(col(Category.name)) == "transfer"
+            )
+        )
+        return result.first()
+
+    existing = await _find()
+    if existing is not None:
+        return existing
+
+    cat = Category(
+        user_id=user_id, name="Transfer", icon="Wallet", color="neutral-2", is_system=True
+    )
+    try:
+        async with session.begin_nested():
+            session.add(cat)
+            await session.flush()
+    except IntegrityError:
+        # A concurrent transfer created the category first; reuse it.
+        existing = await _find()
+        if existing is None:
+            raise
+        return existing
+    await session.refresh(cat)
+    return cat
 
 
 async def _get_group_parent(
