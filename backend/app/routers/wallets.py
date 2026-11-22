@@ -111,6 +111,20 @@ async def get_wallet(
     )
     income_count = income_count_result.one()
 
+    transfer_in_result = await session.exec(
+        select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
+            Transaction.type == "transfer", Transaction.transfer_to_wallet_id == wallet_id, counted
+        )
+    )
+    transfer_in = transfer_in_result.one()
+
+    transfer_out_result = await session.exec(
+        select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
+            Transaction.wallet_id == wallet_id, Transaction.type == "transfer", counted
+        )
+    )
+    transfer_out = transfer_out_result.one()
+
     return WalletSummary(
         id=wallet.id,
         user_id=wallet.user_id,
@@ -125,7 +139,12 @@ async def get_wallet(
         expense_count=int(expense_count),
         total_income=float(total_income),
         income_count=int(income_count),
-        balance=float(total_income) - float(total_expenses),
+        transfer_in=float(transfer_in),
+        transfer_out=float(transfer_out),
+        balance=float(total_income)
+        - float(total_expenses)
+        + float(transfer_in)
+        - float(transfer_out),
     )
 
 
