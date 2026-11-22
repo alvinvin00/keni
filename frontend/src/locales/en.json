@@ -172,6 +172,7 @@
     "outstanding": "Outstanding",
     "availableCredit": "Available credit",
     "utilization": "Utilization",
+    "transferTitle": "Transfer",
     "deleteTitle": "Delete wallet",
     "deleteConfirm": "Are you sure you want to delete <strong>{{name}}</strong>? This will also delete all transactions in this wallet.",
     "toastCreated": "Wallet created",
@@ -179,7 +180,14 @@
     "toastDeleted": "Wallet deleted"
   },
   "transfer": {
-    "incomingPrefix": "from {{name}}"
+    "incomingPrefix": "from {{name}}",
+    "toWallet": "To wallet",
+    "amount": "Amount",
+    "description": "Description",
+    "date": "Date (optional)",
+    "submit": "Transfer",
+    "selfError": "Cannot transfer to the same wallet",
+    "toastCreated": "Transfer created"
   },
   "budgets": {
     "title": "Budgets",

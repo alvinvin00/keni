@@ -172,6 +172,7 @@
     "outstanding": "未繳金額",
     "availableCredit": "可用額度",
     "utilization": "使用率",
+    "transferTitle": "轉帳",
     "deleteTitle": "刪除錢包",
     "deleteConfirm": "確定要刪除 <strong>{{name}}</strong>？這將同時刪除此錢包內的所有交易紀錄。",
     "toastCreated": "錢包已建立",
@@ -179,7 +180,14 @@
     "toastDeleted": "錢包已刪除"
   },
   "transfer": {
-    "incomingPrefix": "來自 {{name}}"
+    "incomingPrefix": "來自 {{name}}",
+    "toWallet": "轉至錢包",
+    "amount": "金額",
+    "description": "說明",
+    "date": "日期（選填）",
+    "submit": "轉帳",
+    "selfError": "無法轉帳至同一個錢包",
+    "toastCreated": "轉帳已建立"
   },
   "budgets": {
     "title": "預算",

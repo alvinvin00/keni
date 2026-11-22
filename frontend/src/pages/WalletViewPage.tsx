@@ -3,13 +3,14 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useParams, useSearchParams, useOutletContext, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { ArrowLeftRight, Check, ChevronDown, Command, CornerDownRight, Filter, FolderOpen, Plus, Search, SortAsc, SortDesc, Sparkles, Tag, Trash2, X } from 'lucide-react';
-import { expenses as expensesApi, categories as categoriesApi, wallets as walletsApi, tags as tagsApi } from '../lib/api';
+import { expenses as expensesApi, categories as categoriesApi, wallets as walletsApi, tags as tagsApi, transfers as transfersApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '../contexts/WalletContext';
 import { useToast } from '../components/ui/Toast';
 import { Select } from '../components/ui/Select';
 import { DatePicker } from '../components/ui/DatePicker';
 import { Modal } from '../components/ui/Modal';
+import { SearchableSelect } from '../components/ui/SearchableSelect';
 import { CategorySelect } from '../components/ui/CategorySelect';
 import { MultiCategorySelect } from '../components/ui/MultiCategorySelect';
 import type { CategoryBrief, CategoryResponse, TransactionListResponse, TransactionResponse, TagResponse, TagBrief, WalletSummary } from '../lib/types';
@@ -42,7 +43,7 @@ export function WalletViewPage() {
   const toast = useToast();
   const { user } = useAuth();
   const { wallets: allWallets } = useWallet();
-  const { expenseAddedKey } = useOutletContext<LayoutOutletContext>();
+  const { expenseAddedKey, onExpenseAdded } = useOutletContext<LayoutOutletContext>();
   const navigate = useNavigate();
   const ctxMenu = useTransactionContextMenu();
   const catMenu = useEditContextMenu<CategoryBrief>();
@@ -65,6 +66,10 @@ export function WalletViewPage() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferSaving, setTransferSaving] = useState(false);
+  const [transferForm, setTransferForm] = useState({ to_wallet_id: '', amount: '', description: '', date: '' });
 
   const [showActionsBar, setShowActionsBar] = useState(false);
 
@@ -281,6 +286,43 @@ export function WalletViewPage() {
     setSelectedIds(new Set());
     setIsSelecting(false);
     lastClickedIndexRef.current = -1;
+  };
+
+  const transferTargets = useMemo(
+    () => allWallets.filter((w) => w.id !== walletId && w.currency === wallet?.currency),
+    [allWallets, walletId, wallet?.currency],
+  );
+
+  const transferAmount = Number(transferForm.amount);
+  const transferValid = transferForm.to_wallet_id !== '' && Number.isFinite(transferAmount) && transferAmount > 0;
+
+  const openTransfer = () => {
+    setTransferForm({ to_wallet_id: '', amount: '', description: '', date: '' });
+    setShowTransfer(true);
+  };
+
+  const handleTransfer = async () => {
+    if (!walletId || !transferValid) return;
+    if (transferForm.to_wallet_id === walletId) {
+      toast(t('transfer.selfError'), 'error');
+      return;
+    }
+    setTransferSaving(true);
+    try {
+      await transfersApi.create(walletId, {
+        to_wallet_id: transferForm.to_wallet_id,
+        amount: Number(transferForm.amount),
+        description: transferForm.description.trim() || undefined,
+        date: transferForm.date ? new Date(transferForm.date).toISOString() : undefined,
+      });
+      toast(t('transfer.toastCreated'), 'success');
+      setShowTransfer(false);
+      onExpenseAdded();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : t('common.failed'), 'error');
+    } finally {
+      setTransferSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -806,6 +848,60 @@ export function WalletViewPage() {
     </Modal>
   );
 
+  const transferModal = (
+    <Modal
+      open={showTransfer}
+      onClose={() => setShowTransfer(false)}
+      title={t('wallets.transferTitle')}
+      footer={
+        <>
+          <button className="btn btn-secondary btn-md" onClick={() => setShowTransfer(false)}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn btn-primary btn-md" onClick={handleTransfer} disabled={transferSaving || !transferValid}>
+            {transferSaving && <span className="btn-spinner" />}
+            {t('transfer.submit')}
+          </button>
+        </>
+      }
+    >
+      <div className="input-group">
+        <label className="input-label">{t('transfer.toWallet')}</label>
+        <SearchableSelect
+          value={transferForm.to_wallet_id}
+          onChange={(v) => setTransferForm({ ...transferForm, to_wallet_id: v })}
+          options={transferTargets.map((w) => ({ value: w.id, label: w.name }))}
+          placeholder={t('transfer.toWallet')}
+        />
+      </div>
+      <div className="input-group">
+        <label className="input-label">{t('transfer.amount')}</label>
+        <input
+          className="input"
+          type="number"
+          min="0"
+          step="any"
+          placeholder="0"
+          value={transferForm.amount}
+          onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })}
+        />
+      </div>
+      <div className="input-group">
+        <label className="input-label">{t('transfer.description')}</label>
+        <input
+          className="input"
+          placeholder={t('expenseDetail.descriptionPlaceholder')}
+          value={transferForm.description}
+          onChange={(e) => setTransferForm({ ...transferForm, description: e.target.value })}
+        />
+      </div>
+      <div className="input-group">
+        <label className="input-label">{t('transfer.date')}</label>
+        <DatePicker value={transferForm.date} onChange={(v) => setTransferForm({ ...transferForm, date: v })} />
+      </div>
+    </Modal>
+  );
+
   const outstanding = wallet ? Math.max(wallet.total_expenses - wallet.total_income - (wallet.transfer_in ?? 0), 0) : 0;
   const creditLimit = wallet?.credit_limit ?? null;
   const availableCredit = creditLimit != null ? creditLimit - outstanding : null;
@@ -817,6 +913,13 @@ export function WalletViewPage() {
         <div>
           <h1 className="page-title">{wallet?.name ?? t('walletView.titleFallback')}</h1>
         </div>
+        {transferTargets.length > 0 && (
+          <div className="page-actions">
+            <button className="btn btn-secondary btn-md" onClick={openTransfer}>
+              <ArrowLeftRight size={16} /> {t('wallets.transferTitle')}
+            </button>
+          </div>
+        )}
       </div>
       {wallet?.type === 'credit' && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -1117,6 +1220,7 @@ export function WalletViewPage() {
       {editCategoryModal}
       {editLabelsModal}
       {aiSuggestModal}
+      {transferModal}
       <BulkActionsBar
         open={showActionsBar}
         onClose={() => setShowActionsBar(false)}
