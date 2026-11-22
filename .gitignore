@@ -1,2 +1,4 @@
 .serena/
 .playwright-mcp/
+test-results/
+playwright-report/
