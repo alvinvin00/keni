@@ -97,6 +97,7 @@ class TransactionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     group_id: uuid.UUID | None = None
+    transfer_to_wallet_id: uuid.UUID | None = None
     children: list[TransactionResponse] | None = None
     linked_transactions: list[TransactionLinkBrief] = Field(default_factory=list)
 

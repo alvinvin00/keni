@@ -46,6 +46,7 @@ from app.schemas.transaction import (
     TransactionResponse,
     TransactionSummary,
     TransactionUpdate,
+    TransferCreate,
 )
 from app.services.ai_transaction import categorize_transaction_with_ai, parse_transactions_with_ai
 
@@ -62,6 +63,7 @@ logger = logging.getLogger(__name__)
 _MAX_IMAGE_DIM = 1568
 
 router = APIRouter(prefix="/api/wallets/{wallet_id}/transactions", tags=["transactions"])
+transfers_router = APIRouter(prefix="/api/wallets/{wallet_id}/transfers", tags=["transfers"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -177,6 +179,7 @@ async def _build_transaction_response(
         created_at=transaction.created_at,
         updated_at=transaction.updated_at,
         group_id=transaction.group_id,
+        transfer_to_wallet_id=transaction.transfer_to_wallet_id,
         children=children,
         linked_transactions=linked_transactions,
     )
@@ -549,6 +552,47 @@ async def create_transaction(
 
     transaction = await _create_single_transaction(wallet_id, body, current_user.id, session)
 
+    await session.commit()
+    await session.refresh(transaction)
+    return await _build_transaction_response(transaction, session)
+
+
+@transfers_router.post("", status_code=status.HTTP_201_CREATED)
+async def create_transfer(
+    wallet_id: uuid.UUID, body: TransferCreate, current_user: CurrentUser, session: DbDep
+) -> TransactionResponse:
+    source = await _get_wallet_or_404(wallet_id, current_user.id, session)
+
+    dest_result = await session.exec(
+        select(Wallet).where(Wallet.id == body.to_wallet_id, Wallet.user_id == current_user.id)
+    )
+    dest = dest_result.first()
+    if dest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found")
+
+    if body.to_wallet_id == wallet_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="cannot transfer to self"
+        )
+
+    if source.currency != dest.currency:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="cross-currency transfers not supported",
+        )
+
+    transfer_category = await _get_or_create_transfer_category(current_user.id, session)
+
+    transaction = Transaction(
+        wallet_id=wallet_id,
+        transfer_to_wallet_id=body.to_wallet_id,
+        category_id=transfer_category.id,
+        type="transfer",
+        amount=body.amount,
+        description=body.description,
+        date=body.date or datetime.now(UTC),
+    )
+    session.add(transaction)
     await session.commit()
     await session.refresh(transaction)
     return await _build_transaction_response(transaction, session)
