@@ -748,20 +748,34 @@ async def list_transactions(  # ruff: ignore[too-many-arguments, too-many-positi
     only_children: Annotated[bool, Query()] = False,
     with_children: Annotated[bool, Query(alias="has_children")] = False,
     transaction_type: Annotated[
-        str | None, Query(alias="type", pattern="^(expense|income)$")
+        str | None, Query(alias="type", pattern="^(expense|income|transfer)$")
     ] = None,
 ) -> TransactionListResponse:
     await _get_wallet_or_404(wallet_id, current_user.id, session)
 
-    query = select(Transaction).where(Transaction.wallet_id == wallet_id)
+    query = select(Transaction)
+
+    if transaction_type == "transfer":
+        # Source OR destination leg — replaces the base wallet filter, since the
+        # destination leg's row carries the source wallet's id.
+        query = query.where(
+            or_(
+                col(Transaction.wallet_id) == wallet_id,
+                col(Transaction.transfer_to_wallet_id) == wallet_id,
+            )
+        )
+    else:
+        query = query.where(Transaction.wallet_id == wallet_id)
+        if transaction_type is None:
+            # Default view hides transfers.
+            query = query.where(col(Transaction.type).in_(["expense", "income"]))
+        else:
+            query = query.where(Transaction.type == transaction_type)
 
     if only_children:
         query = query.where(col(Transaction.group_id).is_not(None))
     elif not include_children:
         query = query.where(col(Transaction.group_id).is_(None))
-
-    if transaction_type is not None:
-        query = query.where(Transaction.type == transaction_type)
     if date_range.start:
         query = query.where(col(Transaction.date) >= date_range.start)
     if date_range.end:
